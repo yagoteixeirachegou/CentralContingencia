@@ -1,0 +1,22 @@
+# Nada local, secreto ou de teste entra na imagem.
+.git
+.claude
+.vs
+.local
+.npm-cache
+.data-protection
+.env
+.env.*
+*.pfx
+*.key
+*.dpapi
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/coverage
+TestResults
+tests
+docs
+scripts
+*.md

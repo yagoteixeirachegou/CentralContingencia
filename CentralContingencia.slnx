@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CentralContingencia.Api/CentralContingencia.Api.csproj" />
+    <Project Path="src/CentralContingencia.Application/CentralContingencia.Application.csproj" />
+    <Project Path="src/CentralContingencia.Domain/CentralContingencia.Domain.csproj" />
+    <Project Path="src/CentralContingencia.Infrastructure/CentralContingencia.Infrastructure.csproj" />
+    <Project Path="src/CentralContingencia.Worker/CentralContingencia.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CentralContingencia.IntegrationTests/CentralContingencia.IntegrationTests.csproj" />
+    <Project Path="tests/CentralContingencia.UnitTests/CentralContingencia.UnitTests.csproj" />
+  </Folder>
+</Solution>

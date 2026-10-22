@@ -1,0 +1,851 @@
+{
+  "name": "P6 - 01 - INGESTAO DE PERFIL (API Central)",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "\n// Chega da saída de erro de qualquer nó entre a reserva e o laço de criação. Só o texto do erro segue adiante.\nconst input = $input.first().json;\nconst raw = input.error ?? input.message ?? 'erro desconhecido';\nconst message = String(typeof raw === 'string' ? raw : raw?.message ?? JSON.stringify(raw)).slice(0, 300);\nconst batchId = $('RESERVAR PROXIES (API)').first().json.batchId;\nif (!batchId) throw new Error('Lote sem identificador: não foi possível liberar. Motivo da falha: ' + message);\nreturn [{ json: { batchId, errorMessage: message } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        96
+      ],
+      "id": "a6860c80-6238-4693-ba05-96d6800f9955",
+      "name": "PREPARAR LIBERAÇÃO DO LOTE"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CLASSIFICAR PERFIS').first().json.apiBase + '/api/v1/integration/profile-ingestions/batches/' + $json.batchId + '/release' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1520,
+        96
+      ],
+      "id": "be50107a-9dfb-467e-840e-990d45d07c4e",
+      "name": "LIBERAR LOTE NA API",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Central de Contingência - chave do n8n"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst failure = $('PREPARAR LIBERAÇÃO DO LOTE').first().json;\nconst response = $input.first().json;\nconst status = Number(response.statusCode);\nconst released = status === 200 ? Number(response.body?.released ?? 0) : null;\nconst mensagem = 'Nenhum perfil foi criado: ' + failure.errorMessage + ' ' +\n  (released === null ? 'ATENÇÃO: não foi possível liberar as proxies reservadas (a Central respondeu ' + (Number.isFinite(status) ? status : 'sem resposta') + '); elas voltam sozinhas em até 15 minutos.'\n    : 'Reservas desfeitas: ' + released + ' (proxies livres e numeração preservada).');\nreturn [{ json: { titulo: 'Falha — nenhum perfil criado', mensagem, liberacaoDoLote: released === null ? 'FALHOU' : 'OK', reservasDesfeitas: released } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        96
+      ],
+      "id": "6eedc7b1-4cee-4ffc-854a-50586b9c6637",
+      "name": "RELATÓRIO DE FALHA"
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1616,
+        -304
+      ],
+      "id": "1d1202e7-f136-401b-b421-863d4c8e6e31",
+      "name": "AGUARDAR 2s (LIMITE DO ADSPOWER) 1",
+      "webhookId": "7b67a4f7-10b8-4821-884e-7929f01d2a3f"
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        -112
+      ],
+      "id": "6e3b2f69-ea39-4d3c-bfd7-a50df8a6d0c0",
+      "name": "AGUARDAR 2s (LIMITE DO ADSPOWER) 2",
+      "webhookId": "d9bf8a8a-f587-4714-a658-ae692bbba1ce"
+    },
+    {
+      "parameters": {
+        "formTitle": "NOVO PERFIL - CONTINGENCIA",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "ARQUIVO DO PERFIL",
+              "fieldType": "file",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        96,
+        -320
+      ],
+      "id": "339b25a6-ee61-4395-b335-265213c88f48",
+      "name": "On form submission",
+      "webhookId": "a326ccf3-8e82-4218-8f2c-96498f9901fd"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first();\nconst binaries = input.binary ?? {};\n\nreturn Object.entries(binaries).map(([fieldName, file]) => ({\n  json: {\n    fileName: file.fileName ?? fieldName,\n    originalBinaryField: fieldName\n  },\n  binary: {\n    data: file\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -320
+      ],
+      "id": "ab599b2e-09ee-48da-8fd4-0964913aa532",
+      "name": "SEPARA PERFIS"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "content",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        -320
+      ],
+      "id": "ea9e28f2-6a65-4daf-b85a-5f7b65202fe0",
+      "name": "EXTRAI PERFIS"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst text = String($json.content ?? '');\nconst source = $('SEPARA PERFIS').item.json;\nconst fileName = source.fileName ?? null;\n\n// =============================================\n// 1. NORMALIZAÇÃO\n// =============================================\n\nconst normalized = text\n  .replace(/\\r/g, '')\n  .replace(/\\u00A0/g, ' ')\n  .trim();\n\nconst lines = normalized\n  .split('\\n')\n  .map(line => line.trim())\n  .filter(Boolean);\n\nfunction cleanLabel(value) {\n  return String(value ?? '')\n    .replace(/\\*\\*/g, '')\n    .replace(/#+/g, '')\n    .trim();\n}\n\nfunction normalizeLabel(value) {\n  return cleanLabel(value)\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction filled(value) {\n  return value !== null &&\n    value !== undefined &&\n    String(value).trim() !== '';\n}\n\nfunction afterColon(line) {\n  const index = line.indexOf(':');\n\n  if (index === -1) return null;\n\n  return line.slice(index + 1).trim() || null;\n}\n\nfunction nextValue(index) {\n  const next = lines[index + 1];\n\n  if (!next) return null;\n\n  // Não consumir outra etiqueta como valor.\n  if (/^[\\wÀ-ÿ /-]+\\s*:/.test(next)) {\n    return null;\n  }\n\n  return next;\n}\n\nfunction valueFromLabel(index) {\n  return afterColon(lines[index]) ??\n    nextValue(index);\n}\n\nfunction detectProvider(email) {\n  if (!email) return null;\n\n  const value = email.toLowerCase();\n\n  if (\n    /@(outlook|hotmail|live)\\./.test(value)\n  ) {\n    return 'outlook';\n  }\n\n  if (/@gmail\\./.test(value)) {\n    return 'gmail';\n  }\n\n  return 'other';\n}\n\nfunction cleanTwoFactor(value) {\n  if (!filled(value)) return null;\n\n  return String(value)\n    .replace(/\\s+/g, '')\n    .trim() || null;\n}\n\n// =============================================\n// 2. ESTRUTURA DE SAÍDA\n// =============================================\n\nconst result = {\n  source: {\n    fileName\n  },\n\n  person: {\n    name: null\n  },\n\n  facebook: {\n    url: null,\n    id: null,\n    login: null,\n    password: null,\n    loginSource: null\n  },\n\n  email: {\n    provider: null,\n    login: null,\n    password: null\n  },\n\n  twoFactor: {\n    current: null,\n    new: null\n  },\n\n  recoveryCodes: [],\n\n  document: {\n    present: false,\n    url: null\n  },\n\n  cookies: {\n    present: false,\n    count: 0,\n    data: null\n  },\n\n  review: {\n    required: false,\n    reasons: []\n  }\n};\n\n// =============================================\n// 3. NOME DA PESSOA\n// =============================================\n\nconst reservedLabels = [\n  'facebook',\n  'outlook',\n  'email',\n  'e-mail',\n  'login',\n  'senha',\n  'login face/email',\n  'senha face/email',\n  'login facebook/email',\n  'senha facebook/email',\n  '2fa',\n  '2fa novo',\n  '2fa- key',\n  '2fa - key',\n  'codigo reserva',\n  'codigo de reserva',\n  'id do perfil',\n  'url'\n];\n\nfor (const line of lines) {\n  const cleaned = cleanLabel(line);\n  const label = normalizeLabel(cleaned);\n\n  const isReserved = reservedLabels.some(\n    reserved => label === reserved\n  );\n\n  const isUrl = /^https?:\\/\\//i.test(cleaned);\n  const isNumeric = /^\\d+$/.test(cleaned);\n  const isEmail = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(cleaned);\n  const isField = cleaned.includes(':');\n\n  if (\n    !isReserved &&\n    !isUrl &&\n    !isNumeric &&\n    !isEmail &&\n    !isField\n  ) {\n    result.person.name = cleaned\n      .replace(/^📄\\s*/, '')\n      .trim();\n\n    break;\n  }\n}\n\n// =============================================\n// 4. URL E ID DO FACEBOOK\n// =============================================\n\nconst facebookUrl = normalized.match(\n  /https?:\\/\\/(?:www\\.)?facebook\\.com\\/[^\\s]+/i\n);\n\nif (facebookUrl) {\n  result.facebook.url = facebookUrl[0];\n\n  const idMatch = facebookUrl[0].match(\n    /[?&]id=(\\d+)/i\n  );\n\n  if (idMatch) {\n    result.facebook.id = idMatch[1];\n  }\n}\n\n// ID numérico em linha separada\nif (!result.facebook.id) {\n  const idLine = lines.find(line =>\n    /^\\d{10,20}$/.test(line)\n  );\n\n  if (idLine) {\n    result.facebook.id = idLine;\n  }\n}\n\n// =============================================\n// 5. DOCUMENTO\n// =============================================\n\nconst documentMatch = normalized.match(\n  /https?:\\/\\/i\\.postimg\\.cc\\/[^\\s]+?\\.(?:png|jpg|jpeg|webp)/i\n);\n\nif (documentMatch) {\n  result.document.present = true;\n  result.document.url = documentMatch[0];\n}\n\n// =============================================\n// 6. CREDENCIAIS\n// =============================================\n\nlet section = null;\n\nfor (let i = 0; i < lines.length; i++) {\n  const original = lines[i];\n  const label = normalizeLabel(original);\n\n  // Seções\n  if (label === 'facebook') {\n    section = 'facebook';\n    continue;\n  }\n\n  if (label === 'outlook' ||\n      label === 'email' ||\n      label === 'e-mail') {\n    section = 'email';\n    continue;\n  }\n\n  // Login compartilhado explícito\n  if (\n    /^login (face|facebook)\\/(email|e-mail)\\s*:?\\s*/.test(label)\n  ) {\n    const value = valueFromLabel(i);\n\n    if (filled(value)) {\n      result.facebook.login = value;\n      result.facebook.loginSource = 'SHARED_EXPLICIT';\n      result.email.login = value;\n    }\n\n    continue;\n  }\n\n  // Senha compartilhada explícita\n  if (\n    /^senha (face|facebook)\\/(email|e-mail)\\s*:?\\s*/.test(label)\n  ) {\n    const value = valueFromLabel(i);\n\n    if (filled(value)) {\n      result.facebook.password = value;\n      result.email.password = value;\n    }\n\n    continue;\n  }\n\n  // FB: login : senha\n  if (\n    label.startsWith('fb:') ||\n    label.startsWith('facebook:')\n  ) {\n    const raw = afterColon(original);\n\n    if (!raw) continue;\n\n    const parts = raw.split(/\\s+:\\s+/);\n\n    result.facebook.login = parts[0]?.trim() || null;\n    result.facebook.loginSource = 'FACEBOOK_EXPLICIT';\n\n    if (parts.length > 1) {\n      result.facebook.password =\n        parts.slice(1).join(' : ').trim();\n    }\n\n    continue;\n  }\n\n  // E-mail: login : senha\n  if (\n    label.startsWith('email:') ||\n    label.startsWith('e-mail:') ||\n    label.startsWith('outlook:')\n  ) {\n    const raw = afterColon(original);\n\n    if (!raw) {\n      const value = nextValue(i);\n\n      if (filled(value)) {\n        result.email.login = value;\n      }\n\n      continue;\n    }\n\n    const parts = raw.split(/\\s+:\\s+/);\n\n    result.email.login = parts[0]?.trim() || null;\n\n    if (parts.length > 1) {\n      result.email.password =\n        parts.slice(1).join(' : ').trim();\n    }\n\n    continue;\n  }\n\n  // Login em seção\n  if (label.startsWith('login:')) {\n    const value = valueFromLabel(i);\n\n    if (section === 'facebook') {\n      result.facebook.login = value;\n      result.facebook.loginSource = 'FACEBOOK_SECTION';\n    } else if (section === 'email') {\n      result.email.login = value;\n    }\n\n    continue;\n  }\n\n  // Senha em seção ou genérica\n  if (label.startsWith('senha:')) {\n    const value = valueFromLabel(i);\n\n    if (section === 'facebook') {\n      result.facebook.password = value;\n    } else if (section === 'email') {\n      result.email.password = value;\n    } else {\n      // Senha genérica: não presumir destino Facebook.\n      result.email.password ??= value;\n    }\n\n    continue;\n  }\n\n  // 2FA novo\n  if (\n    /^2fa novo\\s*:/.test(label) ||\n    label === '2fa novo'\n  ) {\n    result.twoFactor.new =\n      cleanTwoFactor(valueFromLabel(i));\n\n    continue;\n  }\n\n  // 2FA atual\n  if (\n    /^2fa\\s*:/.test(label) ||\n    label === '2fa' ||\n    /^2fa\\s*-\\s*key\\s*:?\\s*/.test(label)\n  ) {\n    result.twoFactor.current =\n      cleanTwoFactor(valueFromLabel(i));\n\n    continue;\n  }\n}\n\n// =============================================\n// 7. REGRAS DE AMBIGUIDADE\n// =============================================\n\n// Alguns TXT possuem apenas EMAIL e SENHA.\n// Preservamos o e-mail sem assumir que ele\n// também seja o login Facebook.\nif (\n  !result.facebook.login &&\n  result.email.login\n) {\n  result.review.required = true;\n  result.review.reasons.push(\n    'Login Facebook não identificado explicitamente.'\n  );\n}\n\nif (\n  result.facebook.login &&\n  !result.facebook.password\n) {\n  result.review.required = true;\n  result.review.reasons.push(\n    'Senha Facebook não identificada.'\n  );\n}\n\nresult.email.provider =\n  detectProvider(result.email.login);\n\n// =============================================\n// 8. CÓDIGOS DE RECUPERAÇÃO\n// =============================================\n\nconst recoveryIndex = lines.findIndex(line => {\n  const label = normalizeLabel(line);\n\n  return (\n    label.startsWith('codigo reserva') ||\n    label.startsWith('codigo de reserva')\n  );\n});\n\nif (recoveryIndex !== -1) {\n  for (\n    let i = recoveryIndex + 1;\n    i < lines.length;\n    i++\n  ) {\n    const line = lines[i];\n\n    if (\n      /^https?:\\/\\//i.test(line) ||\n      /[A-Za-z]/.test(line)\n    ) {\n      break;\n    }\n\n    const codes = line.match(\n      /\\d{4}\\s+\\d{4}/g\n    );\n\n    if (codes) {\n      result.recoveryCodes.push(...codes);\n    }\n  }\n}\n\n// =============================================\n// 9. COOKIES\n// =============================================\n\nconst jsonStart = normalized.indexOf('[{');\n\nif (jsonStart !== -1) {\n  const possibleJson = normalized.slice(jsonStart);\n\n  try {\n    const parsed = JSON.parse(possibleJson);\n\n    if (Array.isArray(parsed)) {\n      result.cookies.present = parsed.length > 0;\n      result.cookies.count = parsed.length;\n      result.cookies.data = parsed;\n    }\n  } catch {\n    result.review.required = true;\n    result.review.reasons.push(\n      'Cookies encontrados, mas JSON inválido.'\n    );\n  }\n}\n\n// =============================================\n// 10. VALIDAÇÃO\n// =============================================\n\nresult.validation = {\n  facebookLoginFound:\n    Boolean(result.facebook.login),\n\n  facebookPasswordFound:\n    Boolean(result.facebook.password),\n\n  emailFound:\n    Boolean(result.email.login),\n\n  emailPasswordFound:\n    Boolean(result.email.password),\n\n  twoFactorFound:\n    Boolean(\n      result.twoFactor.current ||\n      result.twoFactor.new\n    ),\n\n  cookiesFound:\n    result.cookies.present,\n\n  documentFound:\n    result.document.present\n};\n\nreturn result;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        -320
+      ],
+      "id": "5d3a919a-ffb6-4e5b-9d3e-2874db5dd32d",
+      "name": "FORMATA PERFIS"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Separa os TXT aptos dos que precisam de revisão. Nenhuma credencial segue adiante: só metadados.\nconst API_BASE = 'https://host.docker.internal:7090'; // endereço da Central visto de dentro do Docker; troque ao publicar\nconst TARGET_PLATFORM = 'ESTEIRA DE PERFIL';\nconst items = $input.all();\nconst profiles = items.filter(item => item.json.source?.fileName && item.json.facebook && item.json.validation);\nif (!profiles.length) throw new Error('Nenhum TXT recebido.');\nconst names = profiles.map(item => String(item.json.source.fileName).trim().toLowerCase());\nif (new Set(names).size !== names.length) throw new Error('Arquivos TXT duplicados no lote.');\nconst uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });\nconst valid = [], review = [];\nprofiles.forEach((item, index) => {\n  const p = item.json;\n  const facebookIdentifier = String(p.facebook?.login ?? '').trim();\n  const reasons = [...(p.review?.reasons ?? [])];\n  if (!facebookIdentifier) reasons.push('Login Facebook ausente.');\n  if (!p.facebook?.password) reasons.push('Senha Facebook ausente.');\n  const unique = [...new Set(reasons)];\n  if (p.review?.required || unique.length) { review.push({ sourceFile: p.source.fileName, sourceItemIndex: index, reasons: unique }); return; }\n  valid.push({\n    sourceFile: p.source.fileName, sourceItemIndex: index, facebookIdentifier, emailIdentifier: String(p.email?.login ?? '').trim(),\n    facebookAccountPresent: true, emailAccountPresent: Boolean(p.email?.login && p.email?.password), twoFactorPresent: Boolean(p.twoFactor?.current),\n    cookiesPresent: Boolean(p.cookies?.present), cookiesCount: Number(p.cookies?.count ?? 0), documentPresent: Boolean(p.document?.present),\n  });\n});\nconsole.log(JSON.stringify({ received: profiles.length, ready: valid.length, reviewRequired: review.length }));\nif (!valid.length) throw new Error('Nenhum perfil apto para provisionamento. Verifique os arquivos pendentes de revisão.');\n// A chave de idempotência acompanha o item: repetir a chamada (retry) devolve a mesma reserva, sem consumir outra proxy.\nreturn [{ json: { apiBase: API_BASE, idempotencyKey: uuid(), count: valid.length, platform1: TARGET_PLATFORM, valid, review } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -320
+      ],
+      "id": "e5f986f6-1187-4747-bb75-bdaaed6f328b",
+      "name": "CLASSIFICAR PERFIS"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CLASSIFICAR PERFIS').first().json.apiBase + '/api/v1/integration/profile-ingestions/reserve' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.idempotencyKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ count: $json.count, platform1: $json.platform1 }) }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "timeout": 60000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1040,
+        -320
+      ],
+      "id": "8e48d5af-1267-40ff-9062-af50d4a3b37b",
+      "name": "RESERVAR PROXIES (API)",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Central de Contingência - chave do n8n"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst reservation = $input.first().json;\nconst plan = $('CLASSIFICAR PERFIS').first().json;\nif (!reservation || !Array.isArray(reservation.items) || typeof reservation.reserved !== 'number') throw new Error('Resposta inesperada da API da Central.');\nif (reservation.requested !== plan.count) throw new Error('A API atendeu um pedido de tamanho diferente do enviado.');\nconst group = reservation.group;\nif (!group?.id || !['Test', 'Production'].includes(group.mode)) throw new Error('A API não informou o grupo de ingestão do AdsPower.');\nif (reservation.reserved === 0) {\n  const motivo = reservation.pending?.[0]?.message ?? 'Falta de proxy disponível.';\n  throw new Error('Nenhum perfil foi preenchido (' + plan.count + ' solicitado(s)): ' + motivo + ' Arquivos: ' + plan.valid.map(v => v.sourceFile).join(', '));\n}\nif (reservation.items.length > plan.valid.length) throw new Error('A API devolveu mais reservas do que perfis válidos.');\n// Menor número primeiro: o primeiro TXT válido recebe a primeira reserva, e assim por diante.\nreturn reservation.items.map((item, index) => {\n  const entry = plan.valid[index];\n  const proxy = item.proxy;\n  if (!proxy?.host || !proxy?.port || !proxy?.username || !proxy?.password) throw new Error('Reserva sem conexão de proxy para ' + item.profileName + '.');\n  return { json: {\n    batchItemId: item.profileName + '-' + item.allocationId, profileName: item.profileName, profileNumber: item.profileNumber,\n    allocationId: item.allocationId, reservationExpiresAt: item.reservationExpiresAt, groupId: String(group.id), groupName: group.name, environment: group.mode, ...entry,\n    proxy: { host: String(proxy.host), port: Number(proxy.port), username: String(proxy.username), password: String(proxy.password) },\n    status: 'READY_FOR_CREATION' } };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        -320
+      ],
+      "id": "24c0f47a-442f-4b05-b79f-181971f6df71",
+      "name": "MONTA LOTE PROXY",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst filled = value => value !== null && value !== undefined && String(value).trim() !== '';\nreturn $input.all().map(item => {\n  const data = item.json;\n  // O grupo vem da Central: teste (FB Teste | YAGO) ou produção (03 ESTEIRA DE PERFIL). Nunca é fixo no fluxo.\n  if (!filled(data.groupId) || !['Test', 'Production'].includes(data.environment)) throw new Error('Grupo de ingestão do AdsPower ausente.');\n  if (data.status !== 'READY_FOR_CREATION') throw new Error('Perfil sem reserva de proxy.');\n  if (!filled(data.facebookIdentifier)) throw new Error('Identificador Facebook ausente.');\n  const p = data.proxy;\n  if (!filled(p?.host) || !filled(p?.port) || !filled(p?.username) || !filled(p?.password)) throw new Error('Configuração de proxy incompleta.');\n  const port = Number(p.port);\n  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Porta de proxy inválida.');\n  const remark = ['━━━ PERFIL | ESTEIRA ━━━', '', 'PÁGINA |', '', 'DADOS', 'EMAIL: ' + (data.emailIdentifier ?? ''), 'SENHA:', '2FA:', '', 'BMs', '', 'MOVIMENTOS'].join('\\n');\n  const payload = {\n    name: String(data.profileName).trim(), group_id: String(data.groupId), domain_name: 'facebook.com', username: String(data.facebookIdentifier).trim(), remark,\n    user_proxy_config: { proxy_soft: 'other', proxy_type: 'http', proxy_host: String(p.host).trim(), proxy_port: String(port), proxy_user: String(p.username), proxy_password: String(p.password) },\n    fingerprint_config: { automatic_timezone: '1', language: ['pt-BR', 'pt'], webrtc: 'disabled', random_ua: { ua_browser: ['chrome'], ua_system_version: ['Windows 10', 'Windows 11'] } },\n  };\n  return { json: { batchItemId: data.batchItemId, profileName: data.profileName, allocationId: data.allocationId, groupId: String(data.groupId), groupName: data.groupName, environment: data.environment, status: 'PAYLOAD_PREPARED', payload } };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -320
+      ],
+      "id": "9ee31c7a-5e18-4cf6-b39b-3e96ee8d187a",
+      "name": "PREPARAR ADSPOWER",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:50325/api/v1/user/list",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "group_id",
+              "value": "={{ $('RESERVAR PROXIES (API)').first().json.group.id }}"
+            },
+            {
+              "name": "page",
+              "value": "1"
+            },
+            {
+              "name": "page_size",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1712,
+        -304
+      ],
+      "id": "4e918ba1-5b98-4a54-941a-0a0a08dbfaf1",
+      "name": "VERIFICAR ADSPOWER",
+      "executeOnce": true,
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "AdsPower - chave da API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst responses = $input.all();\nconst preparedItems = $('PREPARAR ADSPOWER').all();\nconst groupId = String($('RESERVAR PROXIES (API)').first().json.group?.id ?? '');\nif (!groupId) throw new Error('A API não informou o grupo de ingestão do AdsPower.');\nif (responses.length !== 1) throw new Error('Esperada uma consulta AdsPower, recebidas ' + responses.length + '.');\nconst response = responses[0].json;\nif (response.code !== 0) throw new Error('Consulta AdsPower falhou (code ' + response.code + ': ' + String(response.msg ?? response.message ?? 'sem mensagem').slice(0, 200) + '). Se for limite de chamadas por segundo, aguarde alguns segundos; se for chave, confira a credencial nos nós do AdsPower.');\nconst data = response.data;\nif (!data || !Array.isArray(data.list)) throw new Error('Resposta inválida do AdsPower.');\nconst page = Number(data.page), pageSize = Number(data.page_size);\nif (page !== 1 || !Number.isInteger(pageSize) || pageSize < 1) throw new Error('Paginação inesperada.');\nif (data.list.length >= pageSize) throw new Error('Consulta pode ter mais páginas. Não é seguro autorizar criação.');\nif (!preparedItems.length) throw new Error('Nenhum perfil preparado.');\nconst existingNames = new Set(data.list.map(profile => String(profile.name ?? '').trim().toLowerCase()));\nconst batchNames = new Set();\nreturn preparedItems.map(item => {\n  const prepared = item.json;\n  if (String(prepared.groupId) !== groupId || prepared.status !== 'PAYLOAD_PREPARED') throw new Error('Perfil inválido: ' + prepared.profileName);\n  const name = String(prepared.profileName ?? '').trim();\n  if (!name) throw new Error('Nome de perfil ausente.');\n  const key = name.toLowerCase();\n  if (batchNames.has(key)) throw new Error('Nome duplicado dentro do lote: ' + name);\n  batchNames.add(key);\n  if (existingNames.has(key)) throw new Error('Perfil já existe no AdsPower: ' + name + ' (as reservas vencem sozinhas em 15 minutos).');\n  return { json: { batchItemId: prepared.batchItemId, profileName: name, allocationId: prepared.allocationId, groupId, existingProfilesChecked: data.list.length, duplicateFound: false, status: 'READY_FOR_CREATION' } };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        -304
+      ],
+      "id": "d76e9635-7f77-4367-ba3a-5e64f122b9bf",
+      "name": "VERIFICAR DUPLICATAS",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2096,
+        -304
+      ],
+      "id": "2ab759fc-2b8c-4e54-888e-a4084e05f519",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst current = $input.first().json;\nconst prepared = $('PREPARAR ADSPOWER').all().find(item => item.json.batchItemId === current.batchItemId)?.json;\nif (!prepared?.payload || prepared.profileName !== current.profileName) throw new Error('Payload não encontrado para ' + current.profileName + '.');\nreturn [{ json: { ...current, payload: prepared.payload, status: 'PAYLOAD_READY' } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2128,
+        -128
+      ],
+      "id": "fff1d916-9c59-4447-8caf-96a1cafe4504",
+      "name": "OBTER PAYLOAD"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:50325/api/v1/user/create",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{{ JSON.stringify($json.payload) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2352,
+        -112
+      ],
+      "id": "4db7730a-248a-4e8a-a48f-bf6090ec17fb",
+      "name": "CRIAR PERFIL ADSPOWER",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "AdsPower - chave da API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// O AdsPower responde HTTP 200 mesmo quando recusa; só code 0 com id conta como criado.\nconst response = $input.first().json;\nconst current = $('OBTER PAYLOAD').last().json;\nconst ok = response.code === 0 && Boolean(response.data?.id);\nreturn [{ json: {\n  ok, allocationId: current.allocationId, profileName: current.profileName, batchItemId: current.batchItemId,\n  adsPowerId: ok ? String(response.data.id) : null,\n  serialNumber: ok && response.data.serial_number != null ? String(response.data.serial_number) : null,\n  reason: ok ? null : /too many|per second|rate/i.test(String(response.msg ?? response.message ?? '')) ? 'ADSPOWER_RATE_LIMIT' : 'ADSPOWER_REJECTED',\n  adsPowerCode: response.code ?? null,\n  adsPowerMessage: ok ? null : String(response.msg ?? response.message ?? '').slice(0, 300),\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2576,
+        -288
+      ],
+      "id": "fb6875c3-77ea-4a69-8529-c6b4f8643e39",
+      "name": "REGISTRAR CRIAÇÃO"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8e9e4021-c229-4426-9436-e9adc90f099e",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2800,
+        -288
+      ],
+      "id": "dfc07857-130e-44fe-bbd5-22197660c199",
+      "name": "CRIAÇÃO OK?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CLASSIFICAR PERFIS').first().json.apiBase + '/api/v1/integration/profile-ingestions/' + $json.allocationId + '/confirm' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ adsPowerId: $json.adsPowerId, serialNumber: $json.serialNumber }) }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3024,
+        -400
+      ],
+      "id": "c8384baa-405d-4b10-9b3e-9c7351b2493c",
+      "name": "CONFIRMAR NA API",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Central de Contingência - chave do n8n"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Chega da recusa do AdsPower (item completo) ou da falha de conexão (item de erro): em ambos, identifica a reserva a liberar.\nconst input = $input.first().json;\nconst current = input.allocationId ? input : $('OBTER PAYLOAD').last().json;\n// Só o texto de erro do AdsPower/n8n (nunca o corpo enviado), limitado a 300 caracteres.\nconst detail = input.adsPowerMessage ?? input.error?.message ?? input.message ?? null;\nreturn [{ json: { ok: false, allocationId: current.allocationId, profileName: current.profileName, batchItemId: current.batchItemId, reason: input.reason ?? 'ADSPOWER_UNREACHABLE', adsPowerCode: input.adsPowerCode ?? null, adsPowerMessage: detail === null ? null : String(detail).slice(0, 300) } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3024,
+        -176
+      ],
+      "id": "29c05c1d-2bb5-43eb-ba59-158837ad4f49",
+      "name": "PREPARAR LIBERAÇÃO"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('CLASSIFICAR PERFIS').first().json.apiBase + '/api/v1/integration/profile-ingestions/' + $json.allocationId + '/release' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3248,
+        -176
+      ],
+      "id": "e4bce744-ee07-45bf-87e7-bb89bf2ee739",
+      "name": "LIBERAR NA API",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Central de Contingência - chave do n8n"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst safe = name => { try { return $(name).all().map(item => item.json); } catch (error) { return []; } };\nconst plan = $('CLASSIFICAR PERFIS').first().json;\nconst reservation = $('RESERVAR PROXIES (API)').first().json;\nconst registered = safe('REGISTRAR CRIAÇÃO').filter(item => item.ok);\nconst confirmations = safe('CONFIRMAR NA API');\nconst failures = safe('PREPARAR LIBERAÇÃO');\nconst releases = safe('LIBERAR NA API');\nconst created = registered.map((item, index) => {\n  const status = Number(confirmations[index]?.statusCode);\n  return { perfil: item.profileName, adsPowerId: item.adsPowerId, serie: item.serialNumber, confirmadoNaCentral: status === 204,\n    aviso: status === 204 ? null : 'Perfil criado no AdsPower, mas a Central respondeu ' + (Number.isFinite(status) ? status : 'sem resposta') + ' ao confirmar. Confira a reserva ' + item.allocationId + '.' };\n});\nconst failed = failures.map((item, index) => {\n  const status = Number(releases[index]?.statusCode);\n  return { perfil: item.profileName, motivo: item.reason, codigoAdsPower: item.adsPowerCode ?? null, mensagemAdsPower: item.adsPowerMessage ?? null, proxyLiberada: status === 204 };\n});\n// Os TXT válidos que não receberam reserva (falta de proxy) vêm depois dos atendidos, na ordem do pedido.\nconst unfilled = (reservation.pending ?? []).map((pending, index) => ({ arquivo: plan.valid[reservation.reserved + index]?.sourceFile ?? null, posicao: pending.position, motivo: pending.reason, mensagem: pending.message }));\nconst review = plan.review ?? [];\nconst parts = ['Criados ' + created.filter(c => c.confirmadoNaCentral).length + ' de ' + plan.count + ' perfil(is) válido(s) no grupo \"' + (reservation.group?.name ?? '?') + '\" (' + (reservation.group?.mode === 'Production' ? 'produção' : 'teste') + ').'];\nif (unfilled.length) parts.push(unfilled.length + ' não foi(ram) preenchido(s) por falta de proxy disponível: ' + unfilled.map(u => u.arquivo).join(', ') + '.');\nif (failed.length) parts.push(failed.length + ' falhou(aram) ao criar no AdsPower (proxy liberada): ' + failed.map(f => f.perfil + (f.mensagemAdsPower ? ' [' + f.mensagemAdsPower + ']' : '')).join(', ') + '.');\nif (created.some(c => !c.confirmadoNaCentral)) parts.push('Atenção: há perfil criado no AdsPower sem confirmação na Central.');\nif (review.length) parts.push(review.length + ' arquivo(s) precisam de revisão manual: ' + review.map(r => r.sourceFile).join(', ') + '.');\nconst target = reservation.group ?? {};\nreturn [{ json: {\n  grupo: { nome: target.name ?? null, ambiente: target.mode ?? null },\n  titulo: unfilled.length || failed.length || review.length ? 'Concluído com pendências' : 'Concluído',\n  mensagem: parts.join(' '),\n  resumo: { solicitados: plan.count, reservados: reservation.reserved, criados: created.length, falhasNoAdsPower: failed.length, naoPreenchidosPorFaltaDeProxy: unfilled.length, arquivosParaRevisao: review.length },\n  criados: created, falhas: failed, naoPreenchidos: unfilled, revisaoManual: review,\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3472,
+        -400
+      ],
+      "id": "967df9e4-a8b5-4d79-bbea-feeae1466279",
+      "name": "RELATÓRIO FINAL"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "={{ $json.titulo }}",
+        "completionMessage": "={{ $json.mensagem }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        3696,
+        -400
+      ],
+      "id": "11ae66e9-5d08-4c1a-b9e0-08463a2d4b85",
+      "name": "Resposta ao usuário",
+      "webhookId": "fc75e21b-ea5d-403a-9128-ff76eaa95237"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "SEPARA PERFIS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SEPARA PERFIS": {
+      "main": [
+        [
+          {
+            "node": "EXTRAI PERFIS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EXTRAI PERFIS": {
+      "main": [
+        [
+          {
+            "node": "FORMATA PERFIS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FORMATA PERFIS": {
+      "main": [
+        [
+          {
+            "node": "CLASSIFICAR PERFIS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CLASSIFICAR PERFIS": {
+      "main": [
+        [
+          {
+            "node": "RESERVAR PROXIES (API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESERVAR PROXIES (API)": {
+      "main": [
+        [
+          {
+            "node": "MONTA LOTE PROXY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MONTA LOTE PROXY": {
+      "main": [
+        [
+          {
+            "node": "PREPARAR ADSPOWER",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PREPARAR LIBERAÇÃO DO LOTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR ADSPOWER": {
+      "main": [
+        [
+          {
+            "node": "AGUARDAR 2s (LIMITE DO ADSPOWER) 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PREPARAR LIBERAÇÃO DO LOTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AGUARDAR 2s (LIMITE DO ADSPOWER) 1": {
+      "main": [
+        [
+          {
+            "node": "VERIFICAR ADSPOWER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VERIFICAR ADSPOWER": {
+      "main": [
+        [
+          {
+            "node": "VERIFICAR DUPLICATAS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PREPARAR LIBERAÇÃO DO LOTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VERIFICAR DUPLICATAS": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PREPARAR LIBERAÇÃO DO LOTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "RELATÓRIO FINAL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OBTER PAYLOAD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OBTER PAYLOAD": {
+      "main": [
+        [
+          {
+            "node": "AGUARDAR 2s (LIMITE DO ADSPOWER) 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AGUARDAR 2s (LIMITE DO ADSPOWER) 2": {
+      "main": [
+        [
+          {
+            "node": "CRIAR PERFIL ADSPOWER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAR PERFIL ADSPOWER": {
+      "main": [
+        [
+          {
+            "node": "REGISTRAR CRIAÇÃO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PREPARAR LIBERAÇÃO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REGISTRAR CRIAÇÃO": {
+      "main": [
+        [
+          {
+            "node": "CRIAÇÃO OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAÇÃO OK?": {
+      "main": [
+        [
+          {
+            "node": "CONFIRMAR NA API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PREPARAR LIBERAÇÃO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONFIRMAR NA API": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR LIBERAÇÃO": {
+      "main": [
+        [
+          {
+            "node": "LIBERAR NA API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LIBERAR NA API": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RELATÓRIO FINAL": {
+      "main": [
+        [
+          {
+            "node": "Resposta ao usuário",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREPARAR LIBERAÇÃO DO LOTE": {
+      "main": [
+        [
+          {
+            "node": "LIBERAR LOTE NA API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LIBERAR LOTE NA API": {
+      "main": [
+        [
+          {
+            "node": "RELATÓRIO DE FALHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RELATÓRIO DE FALHA": {
+      "main": [
+        [
+          {
+            "node": "Resposta ao usuário",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

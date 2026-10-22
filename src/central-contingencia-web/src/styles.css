@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+/* Tokens semânticos usados onde a cor muda de papel entre os temas (superfície, link, painel de marca). */
+@theme {
+  --color-surface: #ffffff;
+  --color-link: #075985;
+  --color-ink: #0b2236;
+}
+
+:root {
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  color: var(--color-slate-900);
+  background: var(--color-slate-50);
+}
+
+/* Modo escuro: redefine a paleta neutra e os tons de estado; a cor da marca (sky-800/900) permanece. */
+:root.dark {
+  color-scheme: dark;
+  --color-surface: #0f1828;
+  --color-link: #7dd3fc;
+  --color-ink: #07121f;
+  --color-slate-50: #0b1322;
+  --color-slate-100: #131d30;
+  --color-slate-200: #1c283d;
+  --color-slate-300: #2c3b54;
+  --color-slate-400: #74839a;
+  --color-slate-500: #8695ab;
+  --color-slate-600: #a8b4c6;
+  --color-slate-700: #c2ccda;
+  --color-slate-800: #dbe2ec;
+  --color-slate-900: #e8edf4;
+  --color-slate-950: #f5f8fc;
+  --color-sky-50: #0c2b3f;
+  --color-sky-200: #1b4f6e;
+  --color-sky-700: #38bdf8;
+  --color-red-50: #2a1316;
+  --color-red-200: #5e2429;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-emerald-50: #0d2b22;
+  --color-emerald-700: #34d399;
+  --color-emerald-800: #6ee7b7;
+  --color-amber-50: #2e2210;
+  --color-amber-700: #fbbf24;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: #fde68a;
+}
+
+/* Login: os pares se desenham uma única vez; sem animação quando o sistema pede menos movimento. */
+@keyframes pair-draw { to { stroke-dashoffset: 0; } }
+.pair-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: pair-draw 1.4s cubic-bezier(.2, .7, .2, 1) forwards; }
+.pair-line:nth-child(2n) { animation-delay: .12s; }
+.pair-line:nth-child(3n) { animation-delay: .24s; }
+.pair-line[data-active] { animation-delay: .6s; }
+@media (prefers-reduced-motion: reduce) { .pair-line { animation: none; stroke-dashoffset: 0; } }

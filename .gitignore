@@ -1,0 +1,57 @@
+﻿**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/coverage/
+TestResults/
+.vs/
+.env
+.env.*
+!.env.example
+*.user
+*.log
+.npm-cache/
+.nuget/
+*.pfx
+*.key
+.data-protection/
+.local/
+
+
+# Etapa 2D: nunca versionar dumps de banco, certificados PKCS#12 nem segredos protegidos por DPAPI
+*.dump
+*.dpapi
+*.p12
+.railway/
+
+# Credenciais e arquivos locais
+**/secrets/
+**/*.pem
+**/*.p8
+**/appsettings.Local.json
+**/appsettings.*.local.json
+
+# Arquivos de banco locais
+*.sqlite
+*.sqlite3
+*.db
+*.bak
+*.backup
+*.sql.gz
+
+
+# Cache de compilação TypeScript
+*.tsbuildinfo
+
+# Auditoria pré-commit: dados reais e artefatos locais que nunca devem ser versionados
+# (CLAUDE.md: "Não salvar CSV real no Git"; planilhas e exportações de proxies/perfis contêm credenciais)
+*.csv
+*.xlsx
+*.xls
+*.b64
+*.crt
+*.cer
+*.der
+*.jks
+.claude/settings.local.json
+.idea/

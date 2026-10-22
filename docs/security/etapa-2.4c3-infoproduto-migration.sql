@@ -1,0 +1,14 @@
+﻿START TRANSACTION;
+ALTER TABLE profiles."OperationalProfiles" DROP CONSTRAINT "CK_Profiles_Platform1";
+
+ALTER TABLE profiles."OperationalProfiles" DROP CONSTRAINT "CK_Profiles_Platform2";
+
+ALTER TABLE profiles."OperationalProfiles" ADD CONSTRAINT "CK_Profiles_Platform1" CHECK ("Platform1" IS NULL OR "Platform1" IN ('DARKPOST','MODERAÇÃO','ANUNCIANTE','HOST PÁGINAS','FLAG','BACKUP PIXEL','ESTOURADO','RESTRITA','BUGADO','ATIVO (LIVRE)','ESTEIRA DE PERFIL','MINERAÇÃO','FLAG (LIVRE)','TIKTOK','BM','X1','GOOGLE ADS','INFOPRODUTO'));
+
+ALTER TABLE profiles."OperationalProfiles" ADD CONSTRAINT "CK_Profiles_Platform2" CHECK ("Platform2" IS NULL OR "Platform2" IN ('DARKPOST','MODERAÇÃO','ANUNCIANTE','HOST PÁGINAS','FLAG','BACKUP PIXEL','ESTOURADO','RESTRITA','BUGADO','ATIVO (LIVRE)','ESTEIRA DE PERFIL','MINERAÇÃO','FLAG (LIVRE)','TIKTOK','BM','X1','GOOGLE ADS','INFOPRODUTO'));
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20261012174401_AddInfoproductProfileAssignment', '10.0.8');
+
+COMMIT;
+
